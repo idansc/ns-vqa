@@ -15,6 +15,7 @@
 
 """Test a Detectron network on an imdb (image database)."""
 
+
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -46,8 +47,21 @@ import utils.subprocess as subprocess_utils
 import utils.vis as vis_utils
 from utils.io import save_object
 from utils.timer import Timer
+import h5py
 
 logger = logging.getLogger(__name__)
+
+out_features = list()
+
+def counting_hook(self, input, output):
+    # input is a tuple of packed inputs
+    # output is a Tensor. output.data is the Tensor we are interested
+    #print('Inside ' + self.__class__.__name__ + ' forward')
+    #print('')
+    #print('input: ', input)
+    out_features.append(output)
+
+
 
 
 def get_eval_functions():
@@ -88,6 +102,8 @@ def run_inference(
         args, ind_range=None,
         multi_gpu_testing=False, gpu_id=0,
         check_expected_results=False):
+
+
     parent_func, child_func = get_eval_functions()
     is_parent = ind_range is None
 
@@ -224,6 +240,7 @@ def test_net(
     """Run inference on all images in a dataset or over an index range of images
     in a dataset using a single GPU.
     """
+    #ind_range  = [5,10]
     assert not cfg.MODEL.RPN_ONLY, \
         'Use rpn_generate to generate proposals from RPN-only models'
 
@@ -231,11 +248,15 @@ def test_net(
         dataset_name, proposal_file, ind_range
     )
     model = initialize_model_from_cfg(args, gpu_id=gpu_id)
+    model.module.Box_Head.register_forward_hook(counting_hook)
     num_images = len(roidb)
     num_classes = cfg.MODEL.NUM_CLASSES
     all_boxes, all_segms, all_keyps = empty_results(num_classes, num_images)
+
     timers = defaultdict(Timer)
+    all_boxes_proposals = list()
     for i, entry in enumerate(roidb):
+        
         if cfg.TEST.PRECOMPUTED_PROPOSALS:
             # The roidb may contain ground-truth rois (for example, if the roidb
             # comes from the training or val split). We only want to evaluate
@@ -251,8 +272,8 @@ def test_net(
             box_proposals = None
 
         im = cv2.imread(entry['image'])
-        cls_boxes_i, cls_segms_i, cls_keyps_i = im_detect_all(model, im, box_proposals, timers)
-
+        cls_boxes_i, cls_segms_i, cls_keyps_i, boxes = im_detect_all(model, im, box_proposals, timers)
+        all_boxes_proposals.append(torch.Tensor(boxes))
         extend_results(i, all_boxes, cls_boxes_i)
         if cls_segms_i is not None:
             extend_results(i, all_segms, cls_segms_i)
@@ -273,6 +294,7 @@ def test_net(
                 timers['misc_mask'].average_time +
                 timers['misc_keypoints'].average_time
             )
+
             logger.info(
                 (
                     'im_detect: range [{:d}, {:d}] of {:d}: '
@@ -299,11 +321,41 @@ def test_net(
             )
 
     cfg_yaml = yaml.dump(cfg)
+
+
     if ind_range is not None:
         det_name = 'detection_range_%s_%s.pkl' % tuple(ind_range)
     else:
         det_name = 'detections.pkl'
+    if ind_range is not None:
+        feat_path = 'features_range_%s_%s.h5' % tuple(ind_range)
+    else:
+        feat_path = 'features.h5'
+    feat_path  = os.path.join(output_dir, feat_path)
     det_file = os.path.join(output_dir, det_name)
+    feat = torch.stack(out_features,  dim=0)
+    all_boxes_proposals = torch.stack(all_boxes_proposals, dim=0)
+
+    print(all_boxes_proposals.shape, feat.shape)
+    feat_np = feat.numpy()
+    all_boxes_proposals_np = all_boxes_proposals.numpy()
+    with h5py.File(feat_path, "w") as f:
+        f.create_dataset('features', feat_np.shape, feat_np.dtype)
+        f.create_dataset('boxes', all_boxes_proposals_np.shape, all_boxes_proposals_np.dtype)
+
+    '''
+    if ind_range is not None:
+        feat_path = 'features_range_%s_%s.pkl' % tuple(ind_range)
+    else:
+        feat_path = 'features.pkl'
+    save_object(
+        dict(
+            feat=feat,
+            boxes=all_boxes_proposals,
+        ),  feat_path
+    )
+    logger.info('Wrote features to: {}'.format(os.path.abspath(feat_path)))
+    '''
     save_object(
         dict(
             all_boxes=all_boxes,
@@ -336,7 +388,11 @@ def initialize_model_from_cfg(args, gpu_id=0):
         logger.info("loading detectron weights %s", args.load_detectron)
         load_detectron_weight(model, args.load_detectron)
 
+    #print(model.Conv_Body.res)
+
+
     model = mynn.DataParallel(model, cpu_keywords=['im_info', 'roidb'], minibatch=True)
+
 
     return model
 

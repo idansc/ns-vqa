@@ -46,4 +46,5 @@ def set_up_matplotlib():
 
 def exit_on_error():
     """Exit from a detectron tool when there's an error."""
+    print("error")
     sys.exit(1)

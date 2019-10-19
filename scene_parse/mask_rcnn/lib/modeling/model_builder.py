@@ -153,7 +153,7 @@ class Generalized_RCNN(nn.Module):
         return_dict = {}  # A dict to collect return variables
 
         blob_conv = self.Conv_Body(im_data)
-
+        #print("blob_conv,",[x.shape for x in blob_conv])
         rpn_ret = self.RPN(blob_conv, im_info, roidb)
 
         # if self.training:
@@ -167,13 +167,17 @@ class Generalized_RCNN(nn.Module):
 
         if not self.training:
             return_dict['blob_conv'] = blob_conv
-
         if not cfg.MODEL.RPN_ONLY:
             if cfg.MODEL.SHARE_RES5 and self.training:
                 box_feat, res5_feat = self.Box_Head(blob_conv, rpn_ret)
+                #print(box_feat.shape, res5_feat.shape)
             else:
                 box_feat = self.Box_Head(blob_conv, rpn_ret)
+
             cls_score, bbox_pred = self.Box_Outs(box_feat)
+
+            #print("main_concept", box_feat.shape, bbox_pred.shape, )
+
         else:
             # TODO: complete the returns for RPN only situation
             pass

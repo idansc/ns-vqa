@@ -67,10 +67,10 @@ def im_detect_all(model, im, box_proposals=None, timers=None):
         scores, boxes, im_scale, blob_conv = im_detect_bbox_aug(
             model, im, box_proposals)
     else:
-        scores, boxes, im_scale, blob_conv = im_detect_bbox(
+        scores, boxes, im_scale, blob_conv, prop_boxes = im_detect_bbox(
             model, im, cfg.TEST.SCALE, cfg.TEST.MAX_SIZE, box_proposals)
     timers['im_detect_bbox'].toc()
-
+    #exit(1)
     # score and boxes are from the whole image after score thresholding and nms
     # (they are not separated by class) (numpy.ndarray)
     # cls_boxes boxes and scores are separated by class and in the format used
@@ -78,7 +78,6 @@ def im_detect_all(model, im, box_proposals=None, timers=None):
     timers['misc_bbox'].tic()
     scores, boxes, cls_boxes = box_results_with_nms_and_limit(scores, boxes)
     timers['misc_bbox'].toc()
-
     if cfg.MODEL.MASK_ON and boxes.shape[0] > 0:
         timers['im_detect_mask'].tic()
         if cfg.TEST.MASK_AUG.ENABLED:
@@ -106,8 +105,7 @@ def im_detect_all(model, im, box_proposals=None, timers=None):
         timers['misc_keypoints'].toc()
     else:
         cls_keyps = None
-
-    return cls_boxes, cls_segms, cls_keyps
+    return cls_boxes, cls_segms, cls_keyps, prop_boxes
 
 
 def im_conv_body_only(model, im, target_scale, target_max_size):
@@ -155,7 +153,6 @@ def im_detect_bbox(model, im, target_scale, target_max_size, boxes=None):
         rois = return_dict['rois'].data.cpu().numpy()
         # unscale back to raw image space
         boxes = rois[:, 1:5] / im_scale
-
     # cls prob (activations after softmax)
     scores = return_dict['cls_score'].data.cpu().numpy().squeeze()
     # In case there is 1 proposal
@@ -186,7 +183,7 @@ def im_detect_bbox(model, im, target_scale, target_max_size, boxes=None):
         scores = scores[inv_index, :]
         pred_boxes = pred_boxes[inv_index, :]
 
-    return scores, pred_boxes, im_scale, return_dict['blob_conv']
+    return scores, pred_boxes, im_scale, return_dict['blob_conv'], boxes
 
 
 def im_detect_bbox_aug(model, im, box_proposals=None):
@@ -921,9 +918,11 @@ def _add_multilevel_rois_for_test(blobs, name):
 
 def _get_blobs(im, rois, target_scale, target_max_size):
     """Convert an image and RoIs within that image into network inputs."""
+
     blobs = {}
     blobs['data'], im_scale, blobs['im_info'] = \
         blob_utils.get_image_blob(im, target_scale, target_max_size)
+    #print('The blob keys are: {}'.format(blobs.keys()))
     if rois is not None:
         blobs['rois'] = _get_rois_blob(rois, im_scale)
     return blobs, im_scale

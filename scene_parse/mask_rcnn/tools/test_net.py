@@ -1,5 +1,7 @@
 """Perform inference on one or more datasets."""
 
+from collections import defaultdict
+
 import argparse
 import cv2
 import os
@@ -11,8 +13,12 @@ import torch
 
 import _init_paths  # pylint: disable=unused-import
 from core.config import cfg, merge_cfg_from_file, merge_cfg_from_list, assert_and_infer_cfg
-from core.test_engine import run_inference
+from core.test_engine import run_inference, initialize_model_from_cfg
+from core.test import im_detect_all
+
 import utils.logging
+from utils.timer import Timer
+
 
 # OpenCL may be enabled by default in OpenCV3; disable it because it's not
 # thread safe and causes unwanted GPU memory allocations.
@@ -60,6 +66,11 @@ def parse_args():
         help='Use compositional categories for clevr dataset',
         default=1, type=int)
 
+    parser.add_argument(
+        '--single_image',
+        help='object detection of a single image',
+        default=None, type=str)
+
     return parser.parse_args()
 
 
@@ -91,8 +102,7 @@ if __name__ == '__main__':
         merge_cfg_from_file(args.cfg_file)
     if args.set_cfgs is not None:
         merge_cfg_from_list(args.set_cfgs)
-
-
+    args.dataset = ['clevr', 'train']
     if 'clevr' in args.dataset:
         if args.clevr_comp_cat:
             cfg.MODEL.NUM_CLASSES = 49
@@ -119,8 +129,20 @@ if __name__ == '__main__':
     # manually set args.cuda
     args.cuda = True
 
-    run_inference(
-        args,
-        ind_range=args.range,
-        multi_gpu_testing=args.multi_gpu_testing,
-        check_expected_results=True)
+    if args.single_image is not None:
+        model = initialize_model_from_cfg(args, gpu_id=0)
+        print(args.single_image)
+        im = cv2.imread(args.single_image)
+        box_proposals = None
+        timers = defaultdict(Timer)
+        cls_boxes_i, cls_segms_i, cls_keyps_i = im_detect_all(model, im, box_proposals, timers)
+        print("Boxes:", cls_boxes_i, "Lengths:", [len(x) for x in cls_boxes_i])
+        print("Seg:", cls_segms_i)
+        print("Keypoints:", cls_keyps_i)
+
+    else:
+        run_inference(
+            args,
+            ind_range=args.range,
+            multi_gpu_testing=args.multi_gpu_testing,
+            check_expected_results=True)

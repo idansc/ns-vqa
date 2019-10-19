@@ -47,9 +47,9 @@ DATASETS = {
     },
     'clevr_original_train': { # both clevr_original_train and clevr_original_val are used for testing mask_rcnn
         IM_DIR:
-            osp.join(_DATA_DIR, 'CLEVR_v1.0/images/train'),
+            osp.join('/home/idansc/datasets', 'CLEVR_v1.0/images/train'),
         ANN_FN:
-            osp.join(_DATA_DIR, 'CLEVR_v1.0/scenes/CLEVR_train_scenes.json'),
+            osp.join('/home/idansc/datasets', 'CLEVR_v1.0/scenes/CLEVR_train_scenes.json'),
     },
     'clevr_original_val': {
         IM_DIR:

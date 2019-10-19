@@ -371,8 +371,11 @@ class mask_rcnn_fcn_head_v0up(nn.Module):
             sampling_ratio=cfg.MRCNN.ROI_XFORM_SAMPLING_RATIO
         )
         x = self.res5(x)
-        # print(x.size()) e.g. (128, 2048, 7, 7)
+        print("this is  x", x.size()) #e.g. (128, 2048, 7, 7)
         x = self.upconv5(x)
+        print("this is  up x", x.size()) #e.g. (128, 2048, 7, 7)
+        exit(1)
+
         x = F.relu(x, inplace=True)
         return x
 

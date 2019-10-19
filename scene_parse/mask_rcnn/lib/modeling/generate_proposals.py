@@ -107,7 +107,7 @@ class GenerateProposalsOp(nn.Module):
         post_nms_topN = cfg[cfg_key].RPN_POST_NMS_TOP_N
         nms_thresh = cfg[cfg_key].RPN_NMS_THRESH
         min_size = cfg[cfg_key].RPN_MIN_SIZE
-        # print('generate_proposals:', pre_nms_topN, post_nms_topN, nms_thresh, min_size)
+        #print('generate_proposals:', pre_nms_topN, post_nms_topN, nms_thresh, min_size)
 
         # Transpose and reshape predicted bbox transformations to get them
         # into the same order as the anchors:
@@ -123,7 +123,7 @@ class GenerateProposalsOp(nn.Module):
         #   - reshape to (H * W * A, 1) where rows are ordered by (H, W, A)
         #     to match the order of anchors and bbox_deltas
         scores = scores.transpose((1, 2, 0)).reshape((-1, 1))
-        # print('pre_nms:', bbox_deltas.shape, scores.shape)
+        #print('pre_nms:', bbox_deltas.shape, scores.shape)
 
         # 4. sort all (proposal, score) pairs by score from highest to lowest
         # 5. take top pre_nms_topN (e.g. 6000)
@@ -152,7 +152,7 @@ class GenerateProposalsOp(nn.Module):
         keep = _filter_boxes(proposals, min_size, im_info)
         proposals = proposals[keep, :]
         scores = scores[keep]
-        # print('pre_nms:', proposals.shape, scores.shape)
+        #print('pre_nms:', proposals.shape, scores.shape)
 
         # 6. apply loose nms (e.g. threshold = 0.7)
         # 7. take after_nms_topN (e.g. 300)
@@ -164,7 +164,7 @@ class GenerateProposalsOp(nn.Module):
                 keep = keep[:post_nms_topN]
             proposals = proposals[keep, :]
             scores = scores[keep]
-        # print('final proposals:', proposals.shape, scores.shape)
+        #print('final proposals:', proposals.shape, scores.shape)
         return proposals, scores
 
 
